@@ -2,11 +2,12 @@
 const Venta = require('../models/Venta');
 const Inventario = require('../models/Inventario');
 
+// controllers/VentasController.js
+
 exports.registrarVenta = async (req, res) => {
     const { productos, metodoPago, total } = req.body;
 
     try {
-        // Registrar cada producto en la venta y actualizar el inventario
         const productosVendidos = [];
 
         for (let prod of productos) {
@@ -14,7 +15,7 @@ exports.registrarVenta = async (req, res) => {
 
             if (inventarioProducto && inventarioProducto.cantidadDisponible >= prod.cantidad) {
                 inventarioProducto.cantidadDisponible -= prod.cantidad;
-                await inventarioProducto.save(); // Guardar cambios en el inventario
+                await inventarioProducto.save();
 
                 productosVendidos.push({
                     productoId: prod.productoId,
@@ -25,7 +26,6 @@ exports.registrarVenta = async (req, res) => {
             }
         }
 
-        // Crear el objeto de venta
         const venta = new Venta({
             productos: productosVendidos,
             metodoPago,
@@ -33,14 +33,14 @@ exports.registrarVenta = async (req, res) => {
             fechaHora: new Date()
         });
 
-        // Guardar la venta en la base de datos
         await venta.save();
-        res.status(201).json(venta);  // Devolver la venta creada como respuesta
+        res.status(201).json(venta);
     } catch (error) {
         console.error('Error al registrar la venta:', error);
         res.status(500).json({ error: 'Error al registrar la venta' });
     }
 };
+
 
 
 // Corte de caja por sesión (ventas del día actual o de un rango específico)

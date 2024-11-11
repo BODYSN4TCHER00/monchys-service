@@ -34,58 +34,58 @@ exports.registrarCompra = async (req, res) => {
     const { folio, productos, fecha } = req.body;
 
     try {
-        // Para cada producto, buscamos su precio en la base de datos
         const productosConPrecio = [];
 
         for (let prod of productos) {
-            // Buscar producto por ID
-            const producto = await Producto.findById(prod.productoId);
+            // Buscar el producto por nombre y clasificación
+            let producto = await Producto.findOne({ nombre: prod.name, clasificacion: prod.classification });
             
-            if (producto) {
-                // Agregar el precio unitario al producto en la compra
-                productosConPrecio.push({
-                    productoId: prod.productoId,
-                    cantidad: prod.cantidad,
-                    precioUnitario: producto.precioUnitario
+            if (!producto) {
+                // Crear el producto en la base de datos si no existe
+                producto = new Producto({
+                    nombre: prod.name,
+                    clasificacion: prod.classification,
+                    precioUnitario: prod.price
                 });
+                await producto.save();
+            }
 
-                // Actualizar el inventario: si el producto ya existe en inventario, aumentar la cantidad
-                let inventario = await Inventario.findOne({ productoId: prod.productoId });
+            // Agregar detalles del producto para la compra
+            productosConPrecio.push({
+                productoId: producto._id,
+                cantidad: prod.quantity,
+                precioUnitario: producto.precioUnitario
+            });
 
-                if (inventario) {
-                    // Si el producto ya está en el inventario, actualizamos la cantidad
-                    inventario.cantidadDisponible += prod.cantidad;
-                    await inventario.save(); // Guardar los cambios en el inventario
-                } else {
-                    // Si el producto no existe en inventario, crear uno nuevo
-                    const nuevoInventario = new Inventario({
-                        productoId: prod.productoId,
-                        nombre: producto.nombre,
-                        clasificacion: producto.clasificacion || "General", // Asignar una clasificación por defecto si no existe
-                        cantidadDisponible: prod.cantidad
-                    });
+            // Actualizar o agregar al inventario
+            let inventario = await Inventario.findOne({ productoId: producto._id });
 
-                    await nuevoInventario.save(); // Guardar el nuevo producto en inventario
-                }
-
+            if (inventario) {
+                inventario.cantidadDisponible += prod.quantity;
+                await inventario.save();
             } else {
-                // Si el producto no se encuentra, devolver un error
-                return res.status(400).json({ error: `Producto con ID ${prod.productoId} no encontrado` });
+                const nuevoInventario = new Inventario({
+                    productoId: producto._id,
+                    nombre: producto.nombre,
+                    clasificacion: producto.clasificacion,
+                    cantidadDisponible: prod.quantity
+                });
+                await nuevoInventario.save();
             }
         }
 
-        // Crear el objeto de compra con los productos y precios completos
         const compra = new Compra({
             folio,
             productos: productosConPrecio,
-            fecha: fecha || new Date(),  // Usar la fecha actual si no se proporciona
+            fecha: fecha || new Date()
         });
 
-        // Guardar la compra en la base de datos
         await compra.save();
-        res.status(201).json(compra);  // Devolver la compra creada como respuesta
+        res.status(201).json(compra);
     } catch (error) {
         console.error('Error al registrar la compra:', error);
         res.status(500).json({ error: 'Error al registrar la compra' });
     }
 };
+
+
